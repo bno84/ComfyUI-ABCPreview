@@ -3,6 +3,7 @@ name = "comfyui-abcpreview"
 description = "ABC score preview: sheet music beside highlighted source, with optional playback from a user-supplied soundfont."
 version = "0.1.0"
 license = { file = "LICENSE" }
+requires-python = ">=3.10"
 dependencies = []
 
 [project.urls]
@@ -12,3 +13,4 @@ Repository = "https://github.com/bno84/ComfyUI-ABCPreview"
 PublisherId = "bno84"
 DisplayName = "ABC Preview"
 Icon = ""
+"requires-comfyui" = ">=0.38.0"  # Tested with 0.38.0.
