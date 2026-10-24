@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-abcpreview"
+description = "ABC score preview: sheet music beside highlighted source, with optional playback from a user-supplied soundfont."
+version = "0.1.0"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/bno84/ComfyUI-ABCPreview"
+
+[tool.comfy]
+PublisherId = "bno84"
+DisplayName = "ABC Preview"
+Icon = ""
