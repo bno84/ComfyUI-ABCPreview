@@ -44,17 +44,14 @@ stereo are ignored. SF3 (compressed)
 fonts are not supported. This previews what the ABC says, not how the final
 song sounds. Rendering is CPU-only and takes a few milliseconds per note.
 
-## Files and licenses
+## Vendored code
 
-- `__init__.py`, `soundfont.py`, `web/abc_preview.js`: MIT, © 2026 bno84
-  (`LICENSE`).
-- `vendor/abcjs/`: abcjs 6.7.2 from npm (`abcjs-basic-min.js`,
-  `abcjs-audio.css`), MIT, © Paul Rosen and Gregory Dyke; see its
-  `LICENSE.md`. Its default remote soundfont URLs are never used: playback
-  always points at this pack's local route. It is served by a pack route
-  instead of `web/` because ComfyUI imports every `web/*.js` as a module.
-
-No Python dependencies beyond ComfyUI's own (`numpy`, `aiohttp`).
+`vendor/abcjs/` holds [abcjs 6.7.2 from npm](https://www.npmjs.com/package/abcjs/v/6.7.2)
+(`abcjs-basic-min.js`, `abcjs-audio.css`), MIT, © Paul Rosen and Gregory
+Dyke; see `vendor/abcjs/LICENSE.md`. Its default remote soundfont URLs are
+never used.
+It is served by a pack route instead of `web/`, because ComfyUI imports every
+`web/*.js` as a module.
 
 ## Tests
 
