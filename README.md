@@ -2,8 +2,7 @@
 
 ![ABC Preview node during playback: sheet music above the highlighted ABC source, with the sounding note in red in both](docs/abc-preview.png)
 
-**ABC Preview (Sheet Music + Playback)** (`bno84.ABCPreview`) shows an ABC score
-in a node:
+**ABC Preview (Sheet Music + Playback)** shows an ABC score in a node:
 
 - sheet music rendered with [abcjs](https://github.com/paulrosen/abcjs);
 - the ABC source with syntax highlighting;
@@ -12,13 +11,12 @@ in a node:
   notes highlighted in both views as they sound;
 - **Expand** opens a larger side-by-side view (Esc or Close returns).
 
-The node is a leaf output: connect any `STRING` with ABC. Changing its
-soundfont never invalidates upstream generation. The view updates after the
-node executes; it is a read-only preview, not an editor.
+The node is a leaf output: connect any `STRING` with ABC. The view updates
+after the node executes; it is a read-only preview, not an editor.
 
 ## Install
 
-- **ComfyUI-Manager:** search for *ABC Preview* (Registry ID
+- **ComfyUI-Manager:** search for _ABC Preview_ (Registry ID
   `comfyui-abcpreview`) and install it.
 - **comfy-cli:** `comfy node install comfyui-abcpreview`.
 - **Manually:** `git clone https://github.com/bno84/ComfyUI-ABCPreview` into
@@ -29,29 +27,18 @@ packages.
 
 ## Playback needs a user-supplied soundfont
 
-No sounds are bundled or downloaded. Put a General MIDI `.sf2` file in
-`ComfyUI/models/soundfonts/` (or a `soundfonts:` entry in
-`extra_model_paths.yaml`), refresh the browser, and choose it. With `(none)`,
-or when a workflow names a font this machine lacks, notation still works and
-playback stays disabled; the workflow still runs. Each soundfont keeps its own
-license; this pack's MIT license does not cover it.
+No sounds are bundled or downloaded.
+Notation still works without a soundfont but playback stays disabled.
 
-The backend renders each requested instrument/pitch once on demand: one fixed
-velocity, held up to 6 seconds, mono 22.05 kHz, cached in memory (up to 256
-notes, about 70 MB). It honours sample zones, root key/tuning, loops,
-attenuation, and the volume envelope; filters, modulators, LFOs, effects, and
-stereo are ignored. SF3 (compressed)
-fonts are not supported. This previews what the ABC says, not how the final
-song sounds. Rendering is CPU-only and takes a few milliseconds per note.
+Put a General MIDI `.sf2` file in `ComfyUI/models/soundfonts/`
+(or a `soundfonts:` entry in `extra_model_paths.yaml`), refresh the browser,
+and choose it.
 
 ## Vendored code
 
 `vendor/abcjs/` holds [abcjs 6.7.2 from npm](https://www.npmjs.com/package/abcjs/v/6.7.2)
-(`abcjs-basic-min.js`, `abcjs-audio.css`), MIT, © Paul Rosen and Gregory
-Dyke; see `vendor/abcjs/LICENSE.md`. Its default remote soundfont URLs are
-never used.
-It is served by a pack route instead of `web/`, because ComfyUI imports every
-`web/*.js` as a module.
+MIT © Paul Rosen and Gregory Dyke
+See `vendor/abcjs/LICENSE.md`.
 
 ## Tests
 
