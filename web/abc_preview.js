@@ -317,6 +317,19 @@ class AbcView {
       return this.setStatus(`Playback disabled: choose a soundfont (place .sf2 files in models/soundfonts, then refresh).${warnings}`);
     }
     if (!ABCJS.synth.supportsAudio()) return this.setStatus("Playback is not supported by this browser.", true);
+    let resolved;
+    try {
+      const response = await api.fetchApi(`/bno84/abcpreview/soundfonts?name=${encodeURIComponent(this.font)}`);
+      if (!response.ok) throw new Error(`Cannot check soundfonts (${response.status}).`);
+      resolved = (await response.json()).resolved;
+    } catch (error) {
+      if (generation === this.generation) this.setStatus(`Playback unavailable: ${error?.message ?? error}`, true);
+      return;
+    }
+    if (generation !== this.generation) return;
+    if (!resolved) {
+      return this.setStatus(`Playback disabled: ${this.font} is not installed. Put it in models/soundfonts or a subfolder, then refresh, or choose another soundfont.${warnings}`);
+    }
     const controller = new ABCJS.synth.SynthController();
     controller.load(this.controls, {
       onStart: () => this.highlightSheet([]),
@@ -328,7 +341,7 @@ class AbcView {
       onReady: () => this.setStatus(warnings.trim()),
     }, { displayLoop: true, displayRestart: true, displayPlay: true, displayProgress: true, displayWarp: true });
     this.controller = controller;
-    this.setStatus(`Press play; notes are rendered from ${this.font} on first use.${warnings}`);
+    this.setStatus(`Press play; notes are rendered from ${resolved} on first use.${warnings}`);
     try {
       // Voices plus chord accompaniment clipped at abcjs's default 1.0 multiplier.
       await controller.setTune(visual, false, {

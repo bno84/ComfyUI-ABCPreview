@@ -13,10 +13,10 @@ from comfy_api.latest import ComfyExtension, io
 from server import PromptServer
 
 from .soundfont import GM_INSTRUMENTS, SoundFont, note_to_midi, to_wav
+from .soundfont_files import NONE, choices, resolve
 from .timeline import parse as score_timeline
 
 WEB_DIRECTORY = "./web"
-NONE = "(none)"
 RATE = 22050
 SECONDS = 6.0
 VENDOR = Path(__file__).parent / "vendor" / "abcjs"
@@ -43,8 +43,8 @@ class ABCPreview(io.ComfyNode):
                         "uses a user-supplied .sf2 from models/soundfonts; it previews notes, not the final song.",
             inputs=[
                 io.String.Input("abc", force_input=True),
-                io.Combo.Input("soundfont", options=[NONE, *soundfont_names()], default=NONE,
-                               tooltip="Playback only; place .sf2 files in models/soundfonts."),
+                io.Combo.Input("soundfont", options=choices(soundfont_names()), default=NONE,
+                               tooltip="Playback only; matches the filename in soundfont subfolders too. Missing fonts leave notation available."),
             ],
             is_output_node=True,
         )
@@ -125,14 +125,15 @@ routes = PromptServer.instance.routes
 
 @routes.get("/bno84/abcpreview/soundfonts")
 async def list_soundfonts(request):
-    return web.json_response({"soundfonts": soundfont_names()})
+    available = soundfont_names()
+    return web.json_response({"soundfonts": available, "resolved": resolve(request.query.get("name"), available)})
 
 
 @routes.get("/bno84/abcpreview/soundfont/{token}/{instrument}-mp3/{note}.mp3")
 async def soundfont_note(request):
     # abcjs requests <instrument>-mp3/<note>.mp3; it decodes by content, so WAV is fine.
-    name = _decode_name(request.match_info["token"])
-    if name is None or name not in soundfont_names():
+    name = resolve(_decode_name(request.match_info["token"]), soundfont_names())
+    if name is None:
         raise web.HTTPNotFound(text="Unknown soundfont.")
     instrument = request.match_info["instrument"]
     if instrument not in GM_INSTRUMENTS:

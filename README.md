@@ -43,7 +43,15 @@ Notation still works without a soundfont but playback stays disabled.
 
 Put a General MIDI `.sf2` file in `ComfyUI/models/soundfonts/`
 (or a `soundfonts:` entry in `extra_model_paths.yaml`), refresh the browser,
-and choose it.
+and choose it. A saved selection first matches its installed path, then the same
+filename anywhere in those soundfont folders. Moving a font into a subfolder
+therefore does not require changing the workflow.
+
+`GeneralUser-GS.sf2` stays listed even when absent, so templates can request it
+without a missing-required-model warning. It is not bundled or downloaded.
+If the selected font is missing, the sheet and source still render and explain
+how to enable playback. Select `(none)` to explicitly disable playback.
+New standalone ABC Preview nodes still default to `(none)`.
 
 ## Vendored code
 
