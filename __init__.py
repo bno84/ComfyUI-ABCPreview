@@ -13,6 +13,7 @@ from comfy_api.latest import ComfyExtension, io
 from server import PromptServer
 
 from .soundfont import GM_INSTRUMENTS, SoundFont, note_to_midi, to_wav
+from .timeline import parse as score_timeline
 
 WEB_DIRECTORY = "./web"
 NONE = "(none)"
@@ -58,9 +59,29 @@ class ABCPreview(io.ComfyNode):
         return io.NodeOutput(ui={"abc": [abc]})
 
 
+class ABCTimeline(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="bno84.ABCTimeline",
+            display_name="ABC Timeline (Duration + Sections)",
+            category="audio/ABC",
+            description="Show how long an ABC score plays at its own tempo and meter, with its % comment "
+                        "sections as proportional blocks. Rendered audio can end earlier or run on.",
+            inputs=[io.String.Input("abc", force_input=True)],
+            outputs=[io.Float.Output("seconds", tooltip="The score's nominal duration in seconds.")],
+            is_output_node=True,
+        )
+
+    @classmethod
+    def execute(cls, abc):
+        timeline = score_timeline(abc)
+        return io.NodeOutput(timeline["seconds"], ui={"abc_timeline": [timeline]})
+
+
 class ABCPreviewExtension(ComfyExtension):
     async def get_node_list(self):
-        return [ABCPreview]
+        return [ABCPreview, ABCTimeline]
 
 
 async def comfy_entrypoint():

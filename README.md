@@ -14,6 +14,17 @@
 The node is a leaf output: connect any `STRING` with ABC. The view updates
 after the node executes; it is a read-only preview, not an editor.
 
+**ABC Timeline (Duration + Sections)** shows how long a score plays at its own
+tempo and meter, as minutes and total seconds, with bars, tempo, meter and
+key. Each `% name` comment line starts a section, drawn as a block sized by its
+share of the song; sections with the same name share a color. It also outputs
+the duration in seconds, for example to derive a generation length.
+
+Timing follows the first voice. Each bar lasts one measure of the current
+meter at the current tempo, including inline `[Q:…]` and `[M:…]` changes;
+`Z4` counts as four bars. Without `Q:`, it assumes 120 BPM and says so. This
+is the score's nominal length: rendered audio can end earlier or run on.
+
 ## Install
 
 - **ComfyUI-Manager:** search for _ABC Preview_ (Registry ID
@@ -43,6 +54,6 @@ See `vendor/abcjs/LICENSE.md`.
 ## Tests
 
 ```bash
-node --test tests/test_abc_preview.mjs     # tokenizer and extension wiring
-python3 -m unittest discover -s tests      # renderer; needs numpy
+node --test tests/*.mjs                    # tokenizer, extension wiring, timeline layout
+python3 -m unittest discover -s tests      # renderer (needs numpy) and timeline timing
 ```

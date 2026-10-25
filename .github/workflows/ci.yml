@@ -74,8 +74,9 @@ jobs:
         run: >
           python pack/.github/scripts/comfyui_smoke.py comfyui
           --pack ComfyUI-ABCPreview --cnr-id comfyui-abcpreview
-          --node bno84.ABCPreview
+          --node bno84.ABCPreview --node bno84.ABCTimeline
           --route /extensions/ComfyUI-ABCPreview/abc_preview.js
+          --route /extensions/ComfyUI-ABCPreview/abc_timeline.js
           --route /api/bno84/abcpreview/soundfonts
           --route /api/bno84/abcpreview/abcjs/abcjs-basic-min.js
           --route /api/bno84/abcpreview/abcjs/abcjs-audio.css
