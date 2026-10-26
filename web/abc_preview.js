@@ -176,7 +176,6 @@ class AbcView {
     this.font = NONE;
     this.chords = true;
     this.generation = 0;
-    this.recentSystems = [];
     this.lastMs = 0;
     this.root = document.createElement("div");
     this.root.className = "abcp-root";
@@ -267,19 +266,19 @@ class AbcView {
     this.playing = (groups ?? []).flat();
     for (const element of this.playing) element.classList.add("abcp-playing");
     if (!this.playing.length || milliseconds === undefined || milliseconds < this.lastMs) {
-      this.recentSystems = [];  // Stopped, restarted, or seeking backwards.
+      // Stopped, restarted, or seeking backwards.
       this.sheetLine = undefined;
     }
     if (!this.playing.length) return;
-    // Voices may break lines at different bars, so simultaneous notes can sit
-    // in different systems. Follow the earliest system that sounded recently
-    // instead of jumping between them on every onset.
-    const now = milliseconds ?? 0;
-    this.lastMs = now;
-    for (const element of this.playing) this.recentSystems.push([Number(systemOf(element)), now, element]);
-    this.recentSystems = this.recentSystems.filter(([line, time]) => !Number.isNaN(line) && now - time < 1500);
-    const [line, , element] = this.recentSystems.reduce((a, b) => (b[0] < a[0] ? b : a), this.recentSystems[0] ?? []);
-    if (element) this.sheetLine = alignSystem(this.sheet, String(line), element, this.sheetLine);
+    // Voices may break lines at different bars. Follow the earliest system
+    // in this onset, without retaining notes from earlier onsets: keeping the
+    // previous system for a grace period delays scrolling into the next row.
+    this.lastMs = milliseconds ?? 0;
+    const systems = this.playing
+      .map((element) => [systemOf(element), element])
+      .filter(([line]) => line !== undefined);
+    const [line, element] = systems.reduce((a, b) => (Number(b[0]) < Number(a[0]) ? b : a), systems[0] ?? []);
+    if (element) this.sheetLine = alignSystem(this.sheet, line, element, this.sheetLine);
   }
 
   stop() {

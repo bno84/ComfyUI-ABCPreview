@@ -118,3 +118,78 @@ test("obsolete font lookup cannot enable playback after another refresh", async 
   await pending;
   assert.equal(view.activity.controllers, 0);
 });
+
+function scrollingView(height = 140, scale = 1) {
+  let scrollTop = 0;
+  const sheet = {
+    get scrollTop() { return scrollTop; },
+    set scrollTop(value) { scrollTop = Math.max(0, value); },
+    clientHeight: height,
+    getBoundingClientRect: () => ({ top: 100, bottom: 100 + height * scale, height: height * scale }),
+    querySelectorAll(selector) { return rows[Number(selector.match(/\d+/)[0])] ?? []; },
+  };
+  const part = (line, offset, partHeight) => ({
+    getAttribute: () => `abcjs-note abcjs-l${line}`,
+    classList: { add() {}, remove() {} },
+    getBoundingClientRect() {
+      const top = 100 + (line * 200 + offset - sheet.scrollTop) * scale;
+      return { top, bottom: top + partHeight * scale, height: partHeight * scale };
+    },
+  });
+  const rows = [0, 1, 2].map((line) => [part(line, 0, 100)]);
+  const note = (line) => part(line, 25, 12);
+  const view = { sheet, lastMs: 0, recentSystems: [] };
+  const play = (lines, ms) => AbcView.prototype.highlightSheet.call(view, lines.map((line) => [note(line)]), ms);
+  return { sheet, view, play };
+}
+
+test("scrolls on the first onset of a new row at any pane size or canvas zoom", () => {
+  for (const height of [80, 140, 500]) {
+    for (const scale of [0.5, 1, 2]) {
+      const { sheet, view, play } = scrollingView(height, scale);
+      play([0], 0);
+      play([0], 1000);
+      // The previous onset is only 100 ms old. It must not hold back the row.
+      play([1], 1100);
+      assert.equal(view.sheetLine, "1", `height=${height}, scale=${scale}`);
+      assert.equal(sheet.scrollTop, 196, `height=${height}, scale=${scale}`);
+      play([1], 1200);
+      assert.equal(sheet.scrollTop, 196, "the row stays still between onsets");
+    }
+  }
+});
+
+test("simultaneous voices follow the earliest current row, then advance immediately", () => {
+  const { sheet, view, play } = scrollingView();
+  play([0], 0);
+  play([1, 0], 1000);
+  assert.equal(view.sheetLine, "0");
+  play([1], 1100);
+  assert.equal(view.sheetLine, "1");
+  assert.equal(sheet.scrollTop, 196);
+});
+
+test("backward seeking and repeated sections return to earlier rows", () => {
+  const { sheet, view, play } = scrollingView();
+  play([2], 4000);
+  play([0], 1000);
+  assert.equal(view.sheetLine, "0");
+  assert.equal(sheet.scrollTop, 0);
+  play([1], 2000);
+  // A written repeat revisits row zero while playback time keeps advancing.
+  play([0], 3000);
+  assert.equal(view.sheetLine, "0");
+  assert.equal(sheet.scrollTop, 0);
+});
+
+test("stopping clears the row and notes without moving the sheet", () => {
+  const { sheet, view, play } = scrollingView();
+  play([1], 1000);
+  const position = sheet.scrollTop;
+  play([], undefined);
+  assert.equal(view.sheetLine, undefined);
+  assert.deepEqual(view.playing, []);
+  assert.equal(sheet.scrollTop, position);
+  play([0], 0);
+  assert.equal(view.sheetLine, "0");
+});
