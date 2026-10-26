@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-abcpreview"
 description = "ABC score preview: sheet music beside highlighted source, with optional playback from a user-supplied soundfont, and a score timeline with duration and sections."
-version = "0.3.0"
+version = "0.3.1"
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = []
