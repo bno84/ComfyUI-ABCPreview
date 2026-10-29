@@ -136,6 +136,16 @@ export function tokenizeAbc(text) {
   return tokens;
 }
 
+// Bars per score line snap to 4 or 8 as the pane widens. Each choice has a
+// fixed notation width, and abcjs scales the result to the pane. A wider pane
+// therefore shows more music per line instead of only larger notes.
+const LAYOUTS = [{ bars: 4, staffwidth: 740 }, { bars: 8, staffwidth: 1480 }];
+const WIDE = 1050; // Both layouts are equally far from 1:1 scale here.
+
+export function layoutFor(width) {
+  return LAYOUTS[width >= WIDE ? 1 : 0];
+}
+
 const systemOf = (element) => /\babcjs-l(\d+)\b/.exec(element.getAttribute("class") ?? "")?.[1];
 
 // Align the top of a score system (staves, chord symbols, tempo) with the top
@@ -177,6 +187,7 @@ class AbcView {
     this.chords = true;
     this.generation = 0;
     this.lastMs = 0;
+    this.layout = layoutFor(0);
     this.root = document.createElement("div");
     this.root.className = "abcp-root";
     this.root.innerHTML = `
@@ -204,6 +215,14 @@ class AbcView {
         if (pane.scrollHeight > pane.clientHeight || pane.scrollWidth > pane.clientWidth) event.stopPropagation();
       }, { passive: true });
     }
+    // Reflow only when the pane crosses into another layout.
+    this.resizeObserver = new ResizeObserver(() => {
+      const width = this.sheet.clientWidth;
+      if (!width || layoutFor(width) === this.layout) return;
+      this.layout = layoutFor(width);
+      this.relayout();
+    });
+    this.resizeObserver.observe(this.sheet);
     this.source.addEventListener("click", (event) => {
       const span = event.target.closest?.("span[data-start]");
       if (!span) return;
@@ -304,13 +323,8 @@ class AbcView {
       return this.setStatus(String(error.message ?? error), true);
     }
     if (generation !== this.generation) return;
-    const [visual] = ABCJS.renderAbc(this.score, this.abc, {
-      add_classes: true,
-      responsive: "resize",
-      selectionColor: "#d0021b",
-      clickListener: (element) => this.highlightSource([[element.startChar, element.endChar]]),
-    });
-    this.visual = visual;
+    this.ABCJS = ABCJS;
+    const visual = this.renderSheet();
     const warnings = visual?.warnings?.length ? ` ${visual.warnings.length} ABC parser warning(s).` : "";
     if (this.font === NONE) {
       return this.setStatus(`Playback disabled: choose a soundfont (place .sf2 files in models/soundfonts, then refresh).${warnings}`);
@@ -343,7 +357,8 @@ class AbcView {
     this.setStatus(`Press play; notes are rendered from ${resolved} on first use.${warnings}`);
     try {
       // Voices plus chord accompaniment clipped at abcjs's default 1.0 multiplier.
-      await controller.setTune(visual, false, {
+      // A reflow during the soundfont lookup replaces the visual.
+      await controller.setTune(this.visual, false, {
         soundFontUrl: soundFontUrl(this.font), soundFontVolumeMultiplier: 0.6, chordsOff: !this.chords,
       });
     } catch (error) {
@@ -351,8 +366,42 @@ class AbcView {
     }
   }
 
+  renderSheet() {
+    [this.visual] = this.ABCJS.renderAbc(this.score, this.abc, {
+      add_classes: true,
+      responsive: "resize",
+      staffwidth: this.layout.staffwidth,
+      // Reflows the source's line breaks. A low minimum spacing lets dense
+      // 16th-note bars still fit the chosen count instead of wrapping early.
+      wrap: { minSpacing: 1, maxSpacing: 2.7, preferredMeasuresPerLine: this.layout.bars },
+      selectionColor: "#d0021b",
+      clickListener: (element) => this.highlightSource([[element.startChar, element.endChar]]),
+    });
+    return this.visual;
+  }
+
+  // Redraw the sheet for a new layout without touching the audio. Only the
+  // timer that highlights notes refers to the drawn notes; point it at the new
+  // ones and carry over its position, whether playing or paused.
+  relayout() {
+    if (!this.visual) return; // Nothing drawn yet; refresh uses the new layout.
+    this.highlightSheet([]);
+    const visual = this.renderSheet();
+    if (!this.controller) return;
+    this.controller.visualObj = visual;
+    const timer = this.controller.timer;
+    if (!timer?.lastMoment) return;
+    const running = timer.isRunning && !timer.isPaused;
+    const elapsed = running && timer.startTime ? performance.now() - timer.startTime : timer.currentTime;
+    const percent = Math.min(Math.max((running ? null : timer.pausedPercent) ?? elapsed / timer.lastMoment, 0), 1);
+    timer.replaceTarget(visual);
+    if (running) timer.start(percent);
+    else timer.setProgress(percent);
+  }
+
   destroy() {
     this.generation++;
+    this.resizeObserver.disconnect();
     this.stop();
     this.controller = null;
     this.root.remove();

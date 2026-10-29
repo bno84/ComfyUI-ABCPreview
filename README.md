@@ -4,7 +4,8 @@
 
 **ABC Preview (Sheet Music + Playback)** shows an ABC score in a node:
 
-- sheet music rendered with [abcjs](https://github.com/paulrosen/abcjs);
+- sheet music rendered with [abcjs](https://github.com/paulrosen/abcjs),
+  4 bars per line, or 8 once the node or expanded view is wide enough;
 - the ABC source with syntax highlighting;
 - click a note in either view to locate it in the other;
 - optional playback with play/pause, seek, loop, tempo, chords on/off, and

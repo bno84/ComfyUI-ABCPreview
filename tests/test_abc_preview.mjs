@@ -7,7 +7,7 @@ let fetchFont;
 const source = readFileSync(new URL("../web/abc_preview.js", import.meta.url), "utf8")
   .replace(/^import .*;$/gm, "")
   .replace(/^export /gm, "");
-const { tokenizeAbc, AbcView, libraries } = new Function("app", "api", `${source}\nreturn { tokenizeAbc, AbcView, libraries };`)(
+const { tokenizeAbc, AbcView, layoutFor, libraries } = new Function("app", "api", `${source}\nreturn { tokenizeAbc, AbcView, layoutFor, libraries };`)(
   { registerExtension(value) { extension = value; } },
   { apiURL: (path) => `/api${path}`, fetchApi: (...args) => fetchFont(...args) },
 );
@@ -56,9 +56,9 @@ test("only ABCPreview nodes are extended", () => {
 });
 
 function playbackView(font) {
-  const activity = { rendered: 0, controllers: 0, statuses: [], tunes: [] };
+  const activity = { rendered: 0, controllers: 0, statuses: [], tunes: [], options: [] };
   libraries.set(font, Promise.resolve({
-    renderAbc() { activity.rendered++; return [{ warnings: [] }]; },
+    renderAbc(target, abc, options) { activity.rendered++; activity.options.push(options); return [{ warnings: [] }]; },
     synth: {
       supportsAudio: () => true,
       SynthController: class {
@@ -69,12 +69,68 @@ function playbackView(font) {
     },
   }));
   return {
-    activity, font, abc: "X:1\nK:C\nC4|", generation: 0, score: {}, chords: true,
+    activity, font, abc: "X:1\nK:C\nC4|", generation: 0, score: {}, chords: true, layout: layoutFor(1200),
     controls: { replaceChildren() {} },
-    stop() {}, highlightSheet() {},
+    stop() {}, highlightSheet() {}, renderSheet: AbcView.prototype.renderSheet,
     setStatus(text) { activity.statuses.push(text); },
   };
 }
+
+test("bars per line snap to 4 or 8 by pane width", () => {
+  assert.equal(layoutFor(0).bars, 4);
+  assert.equal(layoutFor(1049).bars, 4);
+  assert.equal(layoutFor(1050).bars, 8);
+  // The same layout object is returned, so resizing within a layout does not reflow.
+  assert.equal(layoutFor(1100), layoutFor(2000));
+});
+
+test("the sheet is wrapped with the current layout", async () => {
+  const view = playbackView("(none)");
+  fetchFont = async () => { assert.fail("must not search when disabled"); };
+  await AbcView.prototype.refresh.call(view);
+  const [options] = view.activity.options;
+  assert.equal(options.staffwidth, 1480);
+  assert.equal(options.wrap.preferredMeasuresPerLine, 8);
+});
+
+function timedView(timer) {
+  const visual = { name: "reflowed" };
+  return {
+    view: {
+      visual: {}, controller: { timer, visualObj: {} }, score: {}, abc: "X:1\nK:C\nC4|", layout: layoutFor(0),
+      ABCJS: { renderAbc: () => [visual] }, highlightSheet() {},
+      renderSheet: AbcView.prototype.renderSheet,
+    },
+    visual,
+  };
+}
+
+function fakeTimer(state) {
+  const calls = [];
+  return {
+    calls, lastMoment: 10000, isPaused: false, pausedPercent: null, currentTime: 0, ...state,
+    replaceTarget(target) { calls.push(["replaceTarget", target]); this.isRunning = false; },
+    start(percent) { calls.push(["start", percent]); },
+    setProgress(percent) { calls.push(["setProgress", percent]); },
+  };
+}
+
+test("reflowing during playback keeps the position and keeps playing", () => {
+  const timer = fakeTimer({ isRunning: true, startTime: performance.now() - 2500 });
+  const { view, visual } = timedView(timer);
+  AbcView.prototype.relayout.call(view);
+  assert.equal(view.controller.visualObj, visual);
+  assert.deepEqual(timer.calls[0], ["replaceTarget", visual]);
+  assert.equal(timer.calls[1][0], "start");
+  assert.ok(Math.abs(timer.calls[1][1] - 0.25) < 0.01);
+});
+
+test("reflowing while paused keeps the paused position", () => {
+  const timer = fakeTimer({ isRunning: false, isPaused: true, pausedPercent: 0.4 });
+  const { view } = timedView(timer);
+  AbcView.prototype.relayout.call(view);
+  assert.deepEqual(timer.calls[1], ["setProgress", 0.4]);
+});
 
 test("missing soundfont preserves notation and explains how to enable playback", async () => {
   const view = playbackView("missing.sf2");
