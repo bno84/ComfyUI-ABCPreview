@@ -2,6 +2,7 @@
 // the sections as proportional blocks over a time axis. Sections that share
 // a name share a color.
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 
 const NODE = "bno84.ABCTimeline";
 const COLORS = ["#7f77dd", "#1d9e75", "#d85a30", "#d4537e", "#378add", "#ba7517", "#639922"];
@@ -114,12 +115,24 @@ function render(root, timeline) {
   root.replaceChildren(element("div", summary(timeline), "summary"), strip, axis, list);
 }
 
+// Use the same parser and execution renderer for history selections and queued scores.
+export async function loadTimeline(node, abc) {
+  const request = node.abcTimelineRequest = (node.abcTimelineRequest ?? 0) + 1;
+  const response = await api.fetchApi("/bno84/abcpreview/timeline", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ abc }),
+  });
+  const timeline = await response.json();
+  if (!response.ok) throw new Error(timeline.error ?? `Cannot load ABC Timeline (${response.status}).`);
+  if (node.abcTimelineRequest === request) node.onExecuted({ abc_timeline: [timeline] });
+}
+
 app.registerExtension({
   name: "bno84.ABCTimeline",
   beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData.name !== NODE) return;
     const onExecuted = nodeType.prototype.onExecuted;
     nodeType.prototype.onExecuted = function (output, ...args) {
+      this.abcTimelineRequest = (this.abcTimelineRequest ?? 0) + 1;
       const result = onExecuted?.call(this, output, ...args);
       if (this.abcTimeline) {
         render(this.abcTimeline, output?.abc_timeline?.[0]);
@@ -136,6 +149,7 @@ app.registerExtension({
   nodeCreated(node) {
     if (node.comfyClass !== NODE) return;
     styles();
+    node.setAbcTimeline = abc => loadTimeline(node, abc);
     node.abcTimeline = element("div", undefined, "abc-timeline");
     render(node.abcTimeline);
     const widget = node.addDOMWidget("timeline", "timeline", node.abcTimeline, {

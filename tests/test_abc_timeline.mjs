@@ -4,7 +4,7 @@ import test from "node:test";
 
 const source = readFileSync(new URL("../web/abc_timeline.js", import.meta.url), "utf8");
 const { blocks, clock, summary, ticks } = new Function("app",
-  source.replace(/^import .*;$/gm, "").replaceAll("export function", "function") + "\nreturn { blocks, clock, summary, ticks };",
+  source.replace(/^import .*;$/gm, "").replaceAll("export function", "function").replaceAll("export async function", "async function") + "\nreturn { blocks, clock, summary, ticks };",
 )({ registerExtension() {} });
 
 const section = (label, start, end, bars) => ({ label, start, end, bars, bar: 0 });
@@ -32,4 +32,27 @@ test("clock and axis ticks", () => {
   assert.equal(clock(59.6), "1:00");
   assert.deepEqual(ticks(80).map((t) => t.seconds), [0, 15, 30, 45, 60, 75]);
   assert.deepEqual(ticks(522).map((t) => t.seconds), [0, 120, 240, 360, 480]);
+});
+
+
+test("direct ABC loading uses the parser route and ignores stale requests", async () => {
+  const requests = [], pending = [];
+  const { loadTimeline } = new Function("app", "api",
+    source.replace(/^import .*;$/gm, "").replaceAll("export function", "function").replaceAll("export async function", "async function").replaceAll("export async function", "async function") + "\nreturn { loadTimeline };",
+  )({ registerExtension() {} }, { fetchApi(path, options) {
+    requests.push([path, JSON.parse(options.body)]);
+    return new Promise(resolve => pending.push(resolve));
+  } });
+  const outputs = [];
+  const node = { onExecuted(output) { outputs.push(output); } };
+  const first = loadTimeline(node, "FIRST"), second = loadTimeline(node, "SECOND");
+  pending[1]({ ok: true, json: async () => TIMELINE });
+  await second;
+  pending[0]({ ok: true, json: async () => ({ bars: 1 }) });
+  await first;
+  assert.deepEqual(requests, [["/bno84/abcpreview/timeline", { abc: "FIRST" }], ["/bno84/abcpreview/timeline", { abc: "SECOND" }]]);
+  assert.deepEqual(outputs, [{ abc_timeline: [TIMELINE] }]);
+  const failed = loadTimeline(node, "BAD");
+  pending[2]({ ok: false, json: async () => ({ error: "Invalid ABC" }) });
+  await assert.rejects(failed, /Invalid ABC/);
 });

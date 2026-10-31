@@ -123,6 +123,18 @@ def _render(path, instrument, key):
 routes = PromptServer.instance.routes
 
 
+@routes.post("/bno84/abcpreview/timeline")
+async def preview_timeline(request):
+    try:
+        body = await request.json()
+        abc = body["abc"]
+        if not isinstance(abc, str):
+            raise ValueError("ABC must be text.")
+        return web.json_response(score_timeline(abc))
+    except (ValueError, KeyError, TypeError) as error:
+        return web.json_response({"error": str(error)}, status=400)
+
+
 @routes.get("/bno84/abcpreview/soundfonts")
 async def list_soundfonts(request):
     available = soundfont_names()
