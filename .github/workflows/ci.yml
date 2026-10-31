@@ -78,7 +78,7 @@ jobs:
           --route /extensions/ComfyUI-ABCPreview/abc_preview.js
           --route /extensions/ComfyUI-ABCPreview/abc_timeline.js
           --route /api/bno84/abcpreview/soundfonts
-          --route /api/bno84/abcpreview/abcjs/abcjs-basic-min.js
+          --route /api/bno84/abcpreview/abcjs/abcjs-basic.js
           --route /api/bno84/abcpreview/abcjs/abcjs-audio.css
 
   publish:

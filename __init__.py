@@ -20,7 +20,7 @@ WEB_DIRECTORY = "./web"
 RATE = 22050
 SECONDS = 6.0
 VENDOR = Path(__file__).parent / "vendor" / "abcjs"
-VENDOR_FILES = {"abcjs-basic-min.js": "application/javascript", "abcjs-audio.css": "text/css"}
+VENDOR_FILES = {"abcjs-basic.js": "application/javascript", "abcjs-audio.css": "text/css"}
 
 # Users supply their own .sf2 files; none are bundled or downloaded.
 folder_paths.add_model_folder_path("soundfonts", os.path.join(folder_paths.models_dir, "soundfonts"), is_default=True)

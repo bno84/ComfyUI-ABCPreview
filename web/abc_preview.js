@@ -14,7 +14,7 @@ const libraries = new Map();
 // One library instance per soundfont keeps notes from different fonts apart.
 function abcjsFor(font) {
   if (!libraries.has(font)) {
-    libraryText ??= fetch(api.apiURL("/bno84/abcpreview/abcjs/abcjs-basic-min.js")).then((response) => {
+    libraryText ??= fetch(api.apiURL("/bno84/abcpreview/abcjs/abcjs-basic.js")).then((response) => {
       if (!response.ok) throw new Error(`abcjs unavailable (${response.status})`);
       return response.text();
     });

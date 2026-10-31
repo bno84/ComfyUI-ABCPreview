@@ -56,7 +56,8 @@ New standalone ABC Preview nodes still default to `(none)`.
 
 ## Vendored code
 
-`vendor/abcjs/` holds [abcjs 6.7.2 from npm](https://www.npmjs.com/package/abcjs/v/6.7.2)
+`vendor/abcjs/` holds the unminified `dist/abcjs-basic.js` of [abcjs 6.7.2 from npm](https://www.npmjs.com/package/abcjs/v/6.7.2),
+unchanged, so it can be reviewed and compared with the published package.
 MIT © Paul Rosen and Gregory Dyke
 See `vendor/abcjs/LICENSE.md`.
 
