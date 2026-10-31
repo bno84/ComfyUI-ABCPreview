@@ -440,11 +440,11 @@ app.registerExtension({
       const result = onNodeCreated?.apply(this, args);
       injectStyles();
       this.abcPreview = new AbcView({ onExpand: () => openOverlay(this) });
-      // canvasOnly: like native media previews; the properties panel would
+      // hideInPanel keeps this visible in both node renderers; the sidebar would
       // otherwise adopt this element and squeeze it to the panel's width.
       const preview = this.addDOMWidget("abc_preview", "abcpreview", this.abcPreview.root, {
         serialize: false,
-        canvasOnly: true,
+        hideInPanel: true,
         hideOnZoom: false,
         getMinHeight: () => 320,
       });

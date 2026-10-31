@@ -153,7 +153,7 @@ app.registerExtension({
     node.abcTimeline = element("div", undefined, "abc-timeline");
     render(node.abcTimeline);
     const widget = node.addDOMWidget("timeline", "timeline", node.abcTimeline, {
-      serialize: false, canvasOnly: true, hideOnZoom: false, getMinHeight: () => 120,
+      serialize: false, hideInPanel: true, hideOnZoom: false, getMinHeight: () => 120,
     });
     widget.serialize = false;
   },
