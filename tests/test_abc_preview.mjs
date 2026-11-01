@@ -55,9 +55,12 @@ test("only ABCPreview nodes are extended", () => {
   }
 });
 
+const FONT_ID = "a".repeat(64);
+
+// Library instances are keyed by soundfont content ID, or "(none)" without one.
 function playbackView(font) {
   const activity = { rendered: 0, controllers: 0, statuses: [], tunes: [], options: [] };
-  libraries.set(font, Promise.resolve({
+  const library = Promise.resolve({
     renderAbc(target, abc, options) { activity.rendered++; activity.options.push(options); return [{ warnings: [] }]; },
     synth: {
       supportsAudio: () => true,
@@ -67,7 +70,8 @@ function playbackView(font) {
         async setTune(visual, autoStart, options) { activity.tunes.push(options); }
       },
     },
-  }));
+  });
+  for (const key of ["(none)", FONT_ID]) libraries.set(key, library);
   return {
     activity, font, abc: "X:1\nK:C\nC4|", generation: 0, score: {}, chords: true, layout: layoutFor(1200),
     controls: { replaceChildren() {} },
@@ -146,12 +150,12 @@ test("missing soundfont preserves notation and explains how to enable playback",
 
 test("matched font enables playback and reports the installed subfolder", async () => {
   const view = playbackView("GeneralUser-GS.sf2");
-  fetchFont = async () => ({ ok: true, json: async () => ({ resolved: "gm/GeneralUser-GS.sf2" }) });
+  fetchFont = async () => ({ ok: true, json: async () => ({ resolved: "gm/GeneralUser-GS.sf2", id: FONT_ID }) });
   await AbcView.prototype.refresh.call(view);
   assert.equal(view.activity.controllers, 1);
   assert.match(view.activity.statuses.at(-1), /gm\/GeneralUser-GS.sf2/);
   assert.equal(view.activity.tunes.length, 1);
-  assert.match(view.activity.tunes[0].soundFontUrl, /soundfont\//);
+  assert.equal(view.activity.tunes[0].soundFontUrl, `/api/bno84/abcpreview/soundfont/${FONT_ID}/`);
 });
 
 test("explicit none keeps playback off without searching for a font", async () => {
@@ -167,10 +171,10 @@ test("obsolete font lookup cannot enable playback after another refresh", async 
   let complete;
   fetchFont = () => new Promise((resolve) => { complete = resolve; });
   const pending = AbcView.prototype.refresh.call(view);
-  // Wait until the library and sheet have loaded and the lookup is pending.
+  // The lookup is pending; nothing may render or play for the old refresh.
   await new Promise((resolve) => setImmediate(resolve));
   view.generation++;
-  complete({ ok: true, json: async () => ({ resolved: "old.sf2" }) });
+  complete({ ok: true, json: async () => ({ resolved: "old.sf2", id: FONT_ID }) });
   await pending;
   assert.equal(view.activity.controllers, 0);
 });

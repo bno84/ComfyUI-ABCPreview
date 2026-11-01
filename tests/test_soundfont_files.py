@@ -1,5 +1,8 @@
 """Resolve optional soundfonts without ComfyUI or audio dependencies."""
+import hashlib
 import importlib.util
+import os
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -31,3 +34,42 @@ class SoundfontFilesTests(unittest.TestCase):
     def test_installed_choices_are_sorted_without_duplicates(self):
         self.assertEqual(files.choices(['z.sf2', files.PREFERRED, 'sub/piano.sf2']),
                          [files.NONE, files.PREFERRED, 'sub/piano.sf2', 'z.sf2'])
+
+
+class ContentIdTests(unittest.TestCase):
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.root = Path(self.folder.name)
+        self.cache = {}
+
+    def tearDown(self):
+        self.folder.cleanup()
+
+    def font(self, name, data):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return str(path)
+
+    def test_id_is_the_sha256_and_follows_content_changes(self):
+        path = self.font("piano.sf2", b"first")
+        self.assertEqual(files.content_id(path, self.cache), hashlib.sha256(b"first").hexdigest())
+        Path(path).write_bytes(b"second, longer")
+        self.assertEqual(files.content_id(path, self.cache), hashlib.sha256(b"second, longer").hexdigest())
+
+    def test_unchanged_files_are_not_read_again(self):
+        path = self.font("piano.sf2", b"first")
+        stat = os.stat(path)
+        self.cache[path] = (stat.st_size, stat.st_mtime_ns, "cached")
+        self.assertEqual(files.content_id(path, self.cache), "cached")
+
+    def test_finds_content_under_any_name_and_rejects_other_ids(self):
+        organ = self.font("organ.sf2", b"organ")
+        copy = self.font("sub/renamed.sf2", b"piano")
+        wanted = hashlib.sha256(b"piano").hexdigest()
+        self.assertEqual(files.find_content(wanted, [organ, copy], self.cache), copy)
+        missing = str(self.root / "gone.sf2")
+        self.assertEqual(files.find_content(wanted, [missing, copy], self.cache), copy)
+        for other in (hashlib.sha256(b"x").hexdigest(), "../piano.sf2", wanted.upper(), wanted[:-1], None):
+            self.assertIsNone(files.find_content(other, [organ, copy], self.cache))
+

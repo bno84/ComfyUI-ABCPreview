@@ -1,7 +1,6 @@
 """ABC sheet-music preview with optional playback from a user-supplied SoundFont."""
 
 import asyncio
-import base64
 import os
 import threading
 from collections import OrderedDict
@@ -13,7 +12,7 @@ from comfy_api.latest import ComfyExtension, io
 from server import PromptServer
 
 from .soundfont import GM_INSTRUMENTS, SoundFont, note_to_midi, to_wav
-from .soundfont_files import NONE, choices, resolve
+from .soundfont_files import NONE, choices, content_id, find_content, resolve
 from .timeline import parse as score_timeline
 
 WEB_DIRECTORY = "./web"
@@ -92,13 +91,12 @@ _fonts = {}
 _notes = OrderedDict()
 _lock = threading.Lock()
 _MAX_NOTES = 256  # About 70 MB of 6-second mono notes.
+_content_ids = {}  # path -> (size, mtime_ns, SHA-256)
 
 
-def _decode_name(token):
-    try:
-        return base64.urlsafe_b64decode(token + "=" * (-len(token) % 4)).decode("utf-8")
-    except (ValueError, UnicodeDecodeError):
-        return None
+def _soundfont_paths():
+    paths = (folder_paths.get_full_path("soundfonts", name) for name in soundfont_names())
+    return [path for path in paths if path]
 
 
 def _render(path, instrument, key):
@@ -138,14 +136,19 @@ async def preview_timeline(request):
 @routes.get("/bno84/abcpreview/soundfonts")
 async def list_soundfonts(request):
     available = soundfont_names()
-    return web.json_response({"soundfonts": available, "resolved": resolve(request.query.get("name"), available)})
+    resolved = resolve(request.query.get("name"), available)
+    found = None
+    if resolved:
+        # Hashing reads the whole file once, so keep it off the event loop.
+        found = await asyncio.to_thread(content_id, folder_paths.get_full_path_or_raise("soundfonts", resolved), _content_ids)
+    return web.json_response({"soundfonts": available, "resolved": resolved, "id": found})
 
 
-@routes.get("/bno84/abcpreview/soundfont/{token}/{instrument}-mp3/{note}.mp3")
+@routes.get("/bno84/abcpreview/soundfont/{id}/{instrument}-mp3/{note}.mp3")
 async def soundfont_note(request):
     # abcjs requests <instrument>-mp3/<note>.mp3; it decodes by content, so WAV is fine.
-    name = resolve(_decode_name(request.match_info["token"]), soundfont_names())
-    if name is None:
+    path = await asyncio.to_thread(find_content, request.match_info["id"], _soundfont_paths(), _content_ids)
+    if path is None:
         raise web.HTTPNotFound(text="Unknown soundfont.")
     instrument = request.match_info["instrument"]
     if instrument not in GM_INSTRUMENTS:
@@ -154,11 +157,10 @@ async def soundfont_note(request):
         key = note_to_midi(request.match_info["note"])
     except ValueError as error:
         raise web.HTTPNotFound(text=str(error))
-    path = folder_paths.get_full_path_or_raise("soundfonts", name)
     try:
         data = await asyncio.to_thread(_render, path, GM_INSTRUMENTS.index(instrument), key)
     except (OSError, ValueError) as error:
-        raise web.HTTPUnprocessableEntity(text=f"Cannot render {name}: {error}")
+        raise web.HTTPUnprocessableEntity(text=f"Cannot render {os.path.basename(path)}: {error}")
     return web.Response(body=data, content_type="audio/wav", headers={"Cache-Control": "no-cache"})
 
 

@@ -11,26 +11,26 @@ let libraryText;
 const libraries = new Map();
 
 // abcjs caches decoded notes by instrument and note name, not by soundfont URL.
-// One library instance per soundfont keeps notes from different fonts apart.
-function abcjsFor(font) {
-  if (!libraries.has(font)) {
+// One library instance per soundfont content ID keeps notes from different
+// fonts apart, including a file whose content changed under the same name.
+function abcjsFor(key) {
+  if (!libraries.has(key)) {
     libraryText ??= fetch(api.apiURL("/bno84/abcpreview/abcjs/abcjs-basic.js")).then((response) => {
       if (!response.ok) throw new Error(`abcjs unavailable (${response.status})`);
       return response.text();
     });
-    libraries.set(font, libraryText.then((text) => {
+    libraries.set(key, libraryText.then((text) => {
       const module = { exports: {} };
       new Function("module", "exports", text)(module, module.exports);
       return module.exports;
     }));
   }
-  return libraries.get(font);
+  return libraries.get(key);
 }
 
-function soundFontUrl(font) {
-  const bytes = new TextEncoder().encode(font);
-  const token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  return api.apiURL(`/bno84/abcpreview/soundfont/${token}/`);
+// The server names each installed soundfont by the SHA-256 of its content.
+function soundFontUrl(id) {
+  return api.apiURL(`/bno84/abcpreview/soundfont/${id}/`);
 }
 
 const STYLE = `
@@ -316,9 +316,21 @@ class AbcView {
       this.setStatus("Run the workflow to preview its ABC score.");
       return;
     }
+    // Look the font up first: its content ID selects the library instance.
+    let found = null, lookupError = null;
+    if (this.font !== NONE) {
+      try {
+        const response = await api.fetchApi(`/bno84/abcpreview/soundfonts?name=${encodeURIComponent(this.font)}`);
+        if (!response.ok) throw new Error(`Cannot check soundfonts (${response.status}).`);
+        found = await response.json();
+      } catch (error) {
+        lookupError = error;
+      }
+      if (generation !== this.generation) return;
+    }
     let ABCJS;
     try {
-      ABCJS = await abcjsFor(this.font);
+      ABCJS = await abcjsFor(found?.id ?? NONE);
     } catch (error) {
       return this.setStatus(String(error.message ?? error), true);
     }
@@ -330,17 +342,9 @@ class AbcView {
       return this.setStatus(`Playback disabled: choose a soundfont (place .sf2 files in models/soundfonts, then refresh).${warnings}`);
     }
     if (!ABCJS.synth.supportsAudio()) return this.setStatus("Playback is not supported by this browser.", true);
-    let resolved;
-    try {
-      const response = await api.fetchApi(`/bno84/abcpreview/soundfonts?name=${encodeURIComponent(this.font)}`);
-      if (!response.ok) throw new Error(`Cannot check soundfonts (${response.status}).`);
-      resolved = (await response.json()).resolved;
-    } catch (error) {
-      if (generation === this.generation) this.setStatus(`Playback unavailable: ${error?.message ?? error}`, true);
-      return;
-    }
-    if (generation !== this.generation) return;
-    if (!resolved) {
+    if (lookupError) return this.setStatus(`Playback unavailable: ${lookupError?.message ?? lookupError}`, true);
+    const resolved = found?.resolved;
+    if (!resolved || !found.id) {
       return this.setStatus(`Playback disabled: ${this.font} is not installed. Put it in models/soundfonts or a subfolder, then refresh, or choose another soundfont.${warnings}`);
     }
     const controller = new ABCJS.synth.SynthController();
@@ -359,7 +363,7 @@ class AbcView {
       // Voices plus chord accompaniment clipped at abcjs's default 1.0 multiplier.
       // A reflow during the soundfont lookup replaces the visual.
       await controller.setTune(this.visual, false, {
-        soundFontUrl: soundFontUrl(this.font), soundFontVolumeMultiplier: 0.6, chordsOff: !this.chords,
+        soundFontUrl: soundFontUrl(found.id), soundFontVolumeMultiplier: 0.6, chordsOff: !this.chords,
       });
     } catch (error) {
       if (generation === this.generation) this.setStatus(`Playback unavailable: ${error?.message ?? error}`, true);
