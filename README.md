@@ -56,10 +56,14 @@ New standalone ABC Preview nodes still default to `(none)`.
 
 ## Vendored code
 
-`vendor/abcjs/` holds the unminified `dist/abcjs-basic.js` of [abcjs 6.7.2 from npm](https://www.npmjs.com/package/abcjs/v/6.7.2),
-unchanged, so it can be reviewed and compared with the published package.
+`web/vendor/abcjs.mjs` is [abcjs 6.7.2 from npm](https://www.npmjs.com/package/abcjs/v/6.7.2),
+bundled unminified as an ES module by esbuild, with `abcjs-audio.css` and the licence copied unchanged.
+`tools/abcjs/` pins both versions in a lockfile; CI rebuilds the bundle and fails if it differs.
+To rebuild: `cd tools/abcjs && npm ci --ignore-scripts && npm run build`.
+The file is served with the pack's other web files, so the preview needs no extra server route.
+`.mjs` files are not auto-loaded as ComfyUI extensions.
 MIT © Paul Rosen and Gregory Dyke
-See `vendor/abcjs/LICENSE.md`.
+See `web/vendor/LICENSE.md`.
 
 ## Tests
 

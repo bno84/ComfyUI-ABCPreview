@@ -1,28 +1,26 @@
 // Sheet music, highlighted ABC source, and optional playback for ABCPreview.
-// abcjs (MIT) is vendored and served by the pack's own route; soundfonts are
-// user-supplied .sf2 files rendered note-by-note by the backend.
+// abcjs (MIT) is bundled as an ES module in web/vendor/ (see tools/abcjs) and
+// imported relative to this file, so it loads wherever the pack's web files are
+// served; soundfonts are user-supplied .sf2 files rendered note-by-note by the backend.
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE = "bno84.ABCPreview";
 const NONE = "(none)";
+const VENDOR = new URL("./vendor/", import.meta.url);
 
-let libraryText;
 const libraries = new Map();
 
-// abcjs caches decoded notes by instrument and note name, not by soundfont URL.
-// One library instance per soundfont content ID keeps notes from different
-// fonts apart, including a file whose content changed under the same name.
+// abcjs caches decoded notes by instrument and note name, not by soundfont URL
+// (abcjs issue #906). The browser keeps one module instance per URL, so a query
+// per soundfont content ID gives each font its own abcjs and note cache,
+// including a file whose content changed under the same name.
 function abcjsFor(key) {
   if (!libraries.has(key)) {
-    libraryText ??= fetch(api.apiURL("/bno84/abcpreview/abcjs/abcjs-basic.js")).then((response) => {
-      if (!response.ok) throw new Error(`abcjs unavailable (${response.status})`);
-      return response.text();
-    });
-    libraries.set(key, libraryText.then((text) => {
-      const module = { exports: {} };
-      new Function("module", "exports", text)(module, module.exports);
-      return module.exports;
+    const url = new URL(`abcjs.mjs?font=${encodeURIComponent(key)}`, VENDOR);
+    libraries.set(key, import(url.href).then((module) => module.default, (error) => {
+      libraries.delete(key);
+      throw new Error(`abcjs unavailable: ${error?.message ?? error}`);
     }));
   }
   return libraries.get(key);
@@ -78,7 +76,7 @@ function injectStyles() {
   if (document.getElementById("abcp-style")) return;
   const audioCss = document.createElement("link");
   audioCss.rel = "stylesheet";
-  audioCss.href = api.apiURL("/bno84/abcpreview/abcjs/abcjs-audio.css");
+  audioCss.href = new URL("abcjs-audio.css", VENDOR).href;
   const style = document.createElement("style");
   style.id = "abcp-style";
   style.textContent = STYLE;

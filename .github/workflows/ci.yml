@@ -53,6 +53,13 @@ jobs:
           python -m unittest discover -s tests -v
       - name: Frontend unit tests
         run: node --test tests/*.mjs
+      - name: Bundled abcjs matches its pinned build
+        # web/vendor/ is build output; rebuild it from tools/abcjs's lockfile and compare.
+        working-directory: tools/abcjs
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          git diff --exit-code -- ../../web/vendor
 
   comfyui:
     name: Loads in ComfyUI (CPU)
@@ -78,8 +85,8 @@ jobs:
           --route /extensions/ComfyUI-ABCPreview/abc_preview.js
           --route /extensions/ComfyUI-ABCPreview/abc_timeline.js
           --route /api/bno84/abcpreview/soundfonts
-          --route /api/bno84/abcpreview/abcjs/abcjs-basic.js
-          --route /api/bno84/abcpreview/abcjs/abcjs-audio.css
+          --route /extensions/ComfyUI-ABCPreview/vendor/abcjs.mjs
+          --route /extensions/ComfyUI-ABCPreview/vendor/abcjs-audio.css
 
   publish:
     name: Publish to the Comfy Registry

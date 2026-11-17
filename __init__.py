@@ -4,7 +4,6 @@ import asyncio
 import os
 import threading
 from collections import OrderedDict
-from pathlib import Path
 
 import folder_paths
 from aiohttp import web
@@ -18,8 +17,6 @@ from .timeline import parse as score_timeline
 WEB_DIRECTORY = "./web"
 RATE = 22050
 SECONDS = 6.0
-VENDOR = Path(__file__).parent / "vendor" / "abcjs"
-VENDOR_FILES = {"abcjs-basic.js": "application/javascript", "abcjs-audio.css": "text/css"}
 
 # Users supply their own .sf2 files; none are bundled or downloaded.
 folder_paths.add_model_folder_path("soundfonts", os.path.join(folder_paths.models_dir, "soundfonts"), is_default=True)
@@ -162,12 +159,3 @@ async def soundfont_note(request):
     except (OSError, ValueError) as error:
         raise web.HTTPUnprocessableEntity(text=f"Cannot render {os.path.basename(path)}: {error}")
     return web.Response(body=data, content_type="audio/wav", headers={"Cache-Control": "no-cache"})
-
-
-@routes.get("/bno84/abcpreview/abcjs/{name}")
-async def abcjs_file(request):
-    # Served outside WEB_DIRECTORY: ComfyUI would import every web/*.js as a module.
-    name = request.match_info["name"]
-    if name not in VENDOR_FILES:
-        raise web.HTTPNotFound()
-    return web.FileResponse(VENDOR / name, headers={"Content-Type": VENDOR_FILES[name]})

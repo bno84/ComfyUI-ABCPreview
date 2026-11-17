@@ -1,0 +1,12 @@
+{
+  "name": "abcpreview-abcjs-build",
+  "private": true,
+  "description": "Bundles abcjs as an ES module for ABC Preview. Run: npm ci --ignore-scripts && npm run build",
+  "scripts": {
+    "build": "esbuild node_modules/abcjs/index.js --bundle --format=esm --legal-comments=inline --banner:js=\"// abcjs 6.7.2 (MIT, see LICENSE.md), bundled as an ES module by tools/abcjs.\" --outfile=../../web/vendor/abcjs.mjs && cp node_modules/abcjs/abcjs-audio.css node_modules/abcjs/LICENSE.md ../../web/vendor/"
+  },
+  "devDependencies": {
+    "abcjs": "6.7.2",
+    "esbuild": "0.28.2"
+  }
+}

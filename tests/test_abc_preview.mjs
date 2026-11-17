@@ -6,7 +6,8 @@ let extension;
 let fetchFont;
 const source = readFileSync(new URL("../web/abc_preview.js", import.meta.url), "utf8")
   .replace(/^import .*;$/gm, "")
-  .replace(/^export /gm, "");
+  .replace(/^export /gm, "")
+  .replace(/import\.meta\.url/g, JSON.stringify("http://comfy.test/extensions/ComfyUI-ABCPreview/abc_preview.js"));
 const { tokenizeAbc, AbcView, layoutFor, libraries } = new Function("app", "api", `${source}\nreturn { tokenizeAbc, AbcView, layoutFor, libraries };`)(
   { registerExtension(value) { extension = value; } },
   { apiURL: (path) => `/api${path}`, fetchApi: (...args) => fetchFont(...args) },
