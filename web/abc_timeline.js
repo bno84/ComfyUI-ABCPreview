@@ -3,6 +3,7 @@
 // a name share a color.
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { RouteUnavailable, routeUnavailable } from "./pack_routes.js";
 
 const NODE = "bno84.ABCTimeline";
 const COLORS = ["#7f77dd", "#1d9e75", "#d85a30", "#d4537e", "#378add", "#ba7517", "#639922"];
@@ -82,9 +83,9 @@ function element(tag, text, className) {
   return node;
 }
 
-function render(root, timeline) {
+function render(root, timeline, note = "Run the workflow to see the score's timeline.") {
   if (!timeline) {
-    root.replaceChildren(element("div", "Run the workflow to see the score's timeline.", "note"));
+    root.replaceChildren(element("div", note, "note"));
     return;
   }
   if (!timeline.bars) {
@@ -121,6 +122,13 @@ export async function loadTimeline(node, abc) {
   const response = await api.fetchApi("/bno84/abcpreview/timeline", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ abc }),
   });
+  if (await routeUnavailable(response)) {
+    // Running the workflow still fills the timeline; say so in the node instead of failing the caller.
+    if (node.abcTimelineRequest === request && node.abcTimeline) {
+      render(node.abcTimeline, null, `${new RouteUnavailable().message} Run the workflow to see this score's timeline.`);
+    }
+    return;
+  }
   const timeline = await response.json();
   if (!response.ok) throw new Error(timeline.error ?? `Cannot load ABC Timeline (${response.status}).`);
   if (node.abcTimelineRequest === request) node.onExecuted({ abc_timeline: [timeline] });

@@ -4,11 +4,13 @@ import test from "node:test";
 
 let extension;
 let fetchFont;
-const source = readFileSync(new URL("../web/abc_preview.js", import.meta.url), "utf8")
+// The extension and the pack-route helper it imports, evaluated together.
+const source = ["pack_routes.js", "abc_preview.js"].map((name) => readFileSync(new URL(`../web/${name}`, import.meta.url), "utf8"))
+  .join("\n")
   .replace(/^import .*;$/gm, "")
   .replace(/^export /gm, "")
   .replace(/import\.meta\.url/g, JSON.stringify("http://comfy.test/extensions/ComfyUI-ABCPreview/abc_preview.js"));
-const { tokenizeAbc, AbcView, layoutFor, libraries } = new Function("app", "api", `${source}\nreturn { tokenizeAbc, AbcView, layoutFor, libraries };`)(
+const { tokenizeAbc, AbcView, layoutFor, libraries, routeUnavailable } = new Function("app", "api", `${source}\nreturn { tokenizeAbc, AbcView, layoutFor, libraries, routeUnavailable };`)(
   { registerExtension(value) { extension = value; } },
   { apiURL: (path) => `/api${path}`, fetchApi: (...args) => fetchFont(...args) },
 );
@@ -157,6 +159,35 @@ test("matched font enables playback and reports the installed subfolder", async 
   assert.match(view.activity.statuses.at(-1), /gm\/GeneralUser-GS.sf2/);
   assert.equal(view.activity.tunes.length, 1);
   assert.equal(view.activity.tunes[0].soundFontUrl, `/api/bno84/abcpreview/soundfont/${FONT_ID}/`);
+});
+
+// What Comfy on Civitai answers for a route a pack registers itself.
+const CIVITAI_501 = {
+  error: { type: "backend_route_unavailable", message: "This action isn't available in Comfy on Civitai" },
+  node_errors: {},
+};
+const json = (body, status) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+test("pack routes count as unavailable on a host's 501 or a plain 404", async () => {
+  assert.equal(await routeUnavailable(json(CIVITAI_501, 501)), true);
+  assert.equal(await routeUnavailable(new Response("404: Not Found", { status: 404 })), true);
+  // The pack's own errors, and other failures, keep their own messages.
+  assert.equal(await routeUnavailable(json({ error: "Unknown soundfont." }, 404)), false);
+  assert.equal(await routeUnavailable(json({ error: { type: "other" } }, 501)), false);
+  assert.equal(await routeUnavailable(new Response("Server error", { status: 500 })), false);
+  assert.equal(await routeUnavailable(json({}, 200)), false);
+});
+
+test("without the pack's routes the sheet still renders and playback says why it is off", async () => {
+  for (const response of [json(CIVITAI_501, 501), new Response("404: Not Found", { status: 404 })]) {
+    const view = playbackView("GeneralUser-GS.sf2");
+    fetchFont = async () => response;
+    await AbcView.prototype.refresh.call(view);
+    assert.equal(view.activity.rendered, 1);
+    assert.equal(view.activity.controllers, 0);
+    assert.equal(view.activity.statuses.at(-1),
+      "Playback is not available on this host: it needs the ABC Preview server routes.");
+  }
 });
 
 test("explicit none keeps playback off without searching for a font", async () => {

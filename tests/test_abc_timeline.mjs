@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync(new URL("../web/abc_timeline.js", import.meta.url), "utf8");
+// The extension and the pack-route helper it imports, evaluated together.
+const source = ["pack_routes.js", "abc_timeline.js"].map((name) => readFileSync(new URL(`../web/${name}`, import.meta.url), "utf8"))
+  .join("\n").replace(/^import .*;$/gm, "").replace(/^export /gm, "");
 const { blocks, clock, summary, ticks } = new Function("app",
-  source.replace(/^import .*;$/gm, "").replaceAll("export function", "function").replaceAll("export async function", "async function") + "\nreturn { blocks, clock, summary, ticks };",
+  source + "\nreturn { blocks, clock, summary, ticks };",
 )({ registerExtension() {} });
 
 const section = (label, start, end, bars) => ({ label, start, end, bars, bar: 0 });
@@ -38,7 +40,7 @@ test("clock and axis ticks", () => {
 test("direct ABC loading uses the parser route and ignores stale requests", async () => {
   const requests = [], pending = [];
   const { loadTimeline } = new Function("app", "api",
-    source.replace(/^import .*;$/gm, "").replaceAll("export function", "function").replaceAll("export async function", "async function").replaceAll("export async function", "async function") + "\nreturn { loadTimeline };",
+    source + "\nreturn { loadTimeline };",
   )({ registerExtension() {} }, { fetchApi(path, options) {
     requests.push([path, JSON.parse(options.body)]);
     return new Promise(resolve => pending.push(resolve));
@@ -55,4 +57,21 @@ test("direct ABC loading uses the parser route and ignores stale requests", asyn
   const failed = loadTimeline(node, "BAD");
   pending[2]({ ok: false, json: async () => ({ error: "Invalid ABC" }) });
   await assert.rejects(failed, /Invalid ABC/);
+});
+
+test("without the parser route the node says so and the caller is not failed", async () => {
+  const { loadTimeline } = new Function("app", "api",
+    source + "\nreturn { loadTimeline };",
+  )({ registerExtension() {} }, { fetchApi: async () => new Response("404: Not Found", { status: 404 }) });
+  const notes = [];
+  const outputs = [];
+  const node = { onExecuted(output) { outputs.push(output); }, abcTimeline: { replaceChildren(note) { notes.push(note.textContent); } } };
+  globalThis.document = { createElement: () => ({}) };
+  try {
+    await loadTimeline(node, "X:1");
+  } finally {
+    delete globalThis.document;
+  }
+  assert.deepEqual(outputs, []);
+  assert.deepEqual(notes, ["Not available on this host: it needs the ABC Preview server routes. Run the workflow to see this score's timeline."]);
 });

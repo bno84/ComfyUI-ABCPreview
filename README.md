@@ -54,6 +54,14 @@ If the selected font is missing, the sheet and source still render and explain
 how to enable playback. Select `(none)` to explicitly disable playback.
 New standalone ABC Preview nodes still default to `(none)`.
 
+### Hosts without the pack's server routes
+
+Some hosts run workflows and serve the pack's web files, but not the routes the
+pack registers on the server; Comfy on Civitai is one. There the sheet and
+source still render and playback says it is not available on this host. ABC
+Timeline fills in when the workflow runs, but not when another node sends it a
+score.
+
 ## Vendored code
 
 `web/vendor/abcjs.mjs` is [abcjs 6.7.2 from npm](https://www.npmjs.com/package/abcjs/v/6.7.2),

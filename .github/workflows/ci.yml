@@ -84,6 +84,7 @@ jobs:
           --node bno84.ABCPreview --node bno84.ABCTimeline
           --route /extensions/ComfyUI-ABCPreview/abc_preview.js
           --route /extensions/ComfyUI-ABCPreview/abc_timeline.js
+          --route /extensions/ComfyUI-ABCPreview/pack_routes.js
           --route /api/bno84/abcpreview/soundfonts
           --route /extensions/ComfyUI-ABCPreview/vendor/abcjs.mjs
           --route /extensions/ComfyUI-ABCPreview/vendor/abcjs-audio.css

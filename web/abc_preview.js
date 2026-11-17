@@ -4,6 +4,7 @@
 // served; soundfonts are user-supplied .sf2 files rendered note-by-note by the backend.
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { RouteUnavailable, requireRoute } from "./pack_routes.js";
 
 const NODE = "bno84.ABCPreview";
 const NONE = "(none)";
@@ -318,7 +319,7 @@ class AbcView {
     let found = null, lookupError = null;
     if (this.font !== NONE) {
       try {
-        const response = await api.fetchApi(`/bno84/abcpreview/soundfonts?name=${encodeURIComponent(this.font)}`);
+        const response = await requireRoute(await api.fetchApi(`/bno84/abcpreview/soundfonts?name=${encodeURIComponent(this.font)}`));
         if (!response.ok) throw new Error(`Cannot check soundfonts (${response.status}).`);
         found = await response.json();
       } catch (error) {
@@ -340,6 +341,8 @@ class AbcView {
       return this.setStatus(`Playback disabled: choose a soundfont (place .sf2 files in models/soundfonts, then refresh).${warnings}`);
     }
     if (!ABCJS.synth.supportsAudio()) return this.setStatus("Playback is not supported by this browser.", true);
+    // The sheet and source still work without the server; only playback needs it.
+    if (lookupError instanceof RouteUnavailable) return this.setStatus(`Playback is not available on this host: ${lookupError.reason}.${warnings}`);
     if (lookupError) return this.setStatus(`Playback unavailable: ${lookupError?.message ?? lookupError}`, true);
     const resolved = found?.resolved;
     if (!resolved || !found.id) {
